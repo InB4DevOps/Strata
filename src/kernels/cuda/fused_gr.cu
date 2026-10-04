@@ -255,9 +255,10 @@ constexpr int UPM_BLOCKS = N / UPM_COLS;          // 160
 
 // `gr_up_kernel` for T tokens: each row of w_up read once; the T dots reduced by xor so every lane holds every
 // sum, and lane k runs token k's epilogue - the T epilogues in parallel instead of one after another.
+template <int MAX_T = kFusedGrMaxT>
 __global__ void __launch_bounds__(THREADS) gr_up_multi_kernel(GrMulti m) {
-    __shared__ __align__(16) float lo[kFusedGrMaxT][LR];
-    __shared__ float g[kFusedGrMaxT][HC][UPM_COLS];
+    __shared__ __align__(16) float lo[MAX_T][LR];
+    __shared__ float g[MAX_T][HC][UPM_COLS];
     const int t = threadIdx.x, lane = t & 31, warp = t >> 5;
     const int T = m.T;
     const int d0 = blockIdx.x * UPM_COLS;
@@ -281,7 +282,7 @@ __global__ void __launch_bounds__(THREADS) gr_up_multi_kernel(GrMulti m) {
         }
         float mine = 0.0f;
 #pragma unroll
-        for (int k = 0; k < kFusedGrMaxT; ++k) {
+        for (int k = 0; k < MAX_T; ++k) {
             if (k >= T) break;
             float acc = dot8(wa, lo[k] + lane * 8);
             if (lane < LR / 8 - 32) acc += dot8(wb, lo[k] + (32 + lane) * 8);
@@ -812,9 +813,17 @@ void launch_multi(const GrMulti& m, int variant, cudaStream_t st, unsigned long 
     if (stamp_buf) gpu_stamp(stamp_buf, stamp_i0 + 1, (void*) st);
 #if defined(STRATA_HIP_GFX906)
     if (fast) gr_up_fast_kernel<<<UPM_BLOCKS, THREADS, 0, st>>>(m);
-    else
+    else {
 #endif
-    gr_up_multi_kernel<<<UPM_BLOCKS, THREADS, 0, st>>>(m);
+    static const bool up_max4_on = [] {
+        const char* v = std::getenv("STRATA_GR_UP_MAX4");
+        return !v || std::atoi(v) != 0;
+    }();
+    if (up_max4_on && n_tok <= 4) gr_up_multi_kernel<4><<<UPM_BLOCKS, THREADS, 0, st>>>(m);
+    else gr_up_multi_kernel<><<<UPM_BLOCKS, THREADS, 0, st>>>(m);
+#if defined(STRATA_HIP_GFX906)
+    }
+#endif
 }
 
 /// STRATA_HC_SPLIT: unset or 2 = the newest the check accepts (staged), 1 = at most split, 0 = the plain read
