@@ -30,6 +30,8 @@ below are 0.1.26's.
 
 ### Prompt processing (tokens/s)
 
+For per-layer and per-chunk measurements of the prompt path, see [Prefill profiling](PREFILL_PROFILING.md).
+
 | Model | 1K | 4K | 32K | 64K | 128K | 262K |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | **Q2_0** | 536 | 1,299 | 2,171 | 2,126 | 2,107 | 1,304† |

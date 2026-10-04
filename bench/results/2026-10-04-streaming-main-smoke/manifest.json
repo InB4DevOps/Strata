@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "config": {
+    "exe": "/home/greg/Strata/engine/strata",
+    "args": [
+      "--pack",
+      "/home/greg/Strata-data/packs/coder-iq1_m",
+      "--native",
+      "/home/greg/Strata-data/models/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf",
+      "--ple-gguf",
+      "/home/greg/Strata-data/models/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00002-of-00002.gguf",
+      "--expert-profile",
+      "/home/greg/Strata/data/expert-profile-coder.bin",
+      "--expert-cache",
+      "auto",
+      "--prefill",
+      "auto",
+      "--spec",
+      "4",
+      "--mtp",
+      "/home/greg/Strata-data/mtp/rt",
+      "--max-context",
+      "262144",
+      "--kv",
+      "int8",
+      "--kv-resident",
+      "32768",
+      "--pcie-frac",
+      "0.00",
+      "--spec-min-p",
+      "0.70"
+    ],
+    "cwd": "/home/greg/Strata",
+    "tokenizer": "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer",
+    "model_name": "qwen3.8-flash-next-coder-iq1_m",
+    "log": "/home/greg/Strata/strata-coder-iq1_m.log",
+    "lib_dirs": [
+      "/usr/local/cuda/bin",
+      "/usr/local/cuda/lib64"
+    ],
+    "port": 8080,
+    "gpu": 0,
+    "gpus_asked": true,
+    "host": "0.0.0.0"
+  },
+  "config_path": "/home/greg/Strata/strata-coder-iq1_m.json",
+  "exe": "/home/greg/Strata/build/strata",
+  "exe_sha256": "e4669099caf58fcbb0b79b9e607ab2d19387b7171c023fb58489474ac7e8ba6e",
+  "runner_sha256": "a55372c80e53a579ff2c5f79dbdeef49d66a07c5a939d3203e548521d0f549b1",
+  "cwd": "/home/greg/Strata",
+  "cases": [
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 1041,
+      "chunk": "1024",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 2048,
+      "prompt_sha256": "573a8f124ee106b6b5199b2ce21cbd501f144ba2564c8070c171ab6460ea704f",
+      "id": "883a45e310626371"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 1041,
+      "chunk": "256",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 2048,
+      "prompt_sha256": "573a8f124ee106b6b5199b2ce21cbd501f144ba2564c8070c171ab6460ea704f",
+      "id": "48c9f2f59d1b0fde"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 529,
+      "chunk": "1024",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 2048,
+      "prompt_sha256": "e5c3e1d6232de8b34db9f52d0226f500758a162417dc3211cf684f6bda144ae0",
+      "id": "5fa6cac46c01a823"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 529,
+      "chunk": "256",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 2048,
+      "prompt_sha256": "e5c3e1d6232de8b34db9f52d0226f500758a162417dc3211cf684f6bda144ae0",
+      "id": "84bd70e1f8e08f98"
+    }
+  ],
+  "rounds": 1,
+  "warmup_pairs": 0,
+  "check_residuals": true,
+  "seed": 1729,
+  "kv_resident": 0,
+  "timeout": 600,
+  "environment": {
+    "LD_LIBRARY_PATH": "/usr/local/cuda/bin:/usr/local/cuda/lib64:/usr/local/cuda/lib64",
+    "STRATA_STATE_HASH_GDN": "1"
+  },
+  "hardware": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700KF",
+    "logical_cpus": 20,
+    "nvidia": "NVIDIA GeForce RTX 3060, GPU-add57d0d-2bea-d200-0ea3-ee561b1e0fa8, 580.178.04, 00000000:01:00.0, 12288 MiB",
+    "amd": null,
+    "ram_bytes": 67262435328
+  },
+  "model_assets": {
+    "/home/greg/Strata-data/packs/coder-iq1_m/dense.bin": {
+      "bytes": 1475120640,
+      "mtime_ns": 1790806700861269022
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/index.txt": {
+      "bytes": 93633,
+      "mtime_ns": 1790806700862269040
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/native_experts.txt": {
+      "bytes": 3269,
+      "mtime_ns": 1790806701449018934
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/chat_template.jinja": {
+      "bytes": 9993,
+      "mtime_ns": 1790806701429279336
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/merges.txt": {
+      "bytes": 3353258,
+      "mtime_ns": 1790806701304277066
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/token_type.json": {
+      "bytes": 744960,
+      "mtime_ns": 1790806701312153333
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/tokenizer.json": {
+      "bytes": 541,
+      "mtime_ns": 1790806701312277212
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/vocab.json": {
+      "bytes": 5737005,
+      "mtime_ns": 1790806701249276068
+    },
+    "/home/greg/Strata-data/models/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf": {
+      "bytes": 29608446496,
+      "mtime_ns": 1790806679375878870
+    },
+    "/home/greg/Strata-data/models/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00002-of-00002.gguf": {
+      "bytes": 28800138432,
+      "mtime_ns": 1790631687317408073
+    },
+    "/home/greg/Strata/data/expert-profile-coder.bin": {
+      "bytes": 98328,
+      "mtime_ns": 1790629844935809638
+    },
+    "/home/greg/Strata-data/mtp/rt/dense.bin": {
+      "bytes": 116099072,
+      "mtime_ns": 1790631979688733260
+    },
+    "/home/greg/Strata-data/mtp/rt/dense.txt": {
+      "bytes": 1851,
+      "mtime_ns": 1790631979689661038
+    },
+    "/home/greg/Strata-data/mtp/rt/draft_vocab.bin": {
+      "bytes": 425196,
+      "mtime_ns": 1790784879180776839
+    },
+    "/home/greg/Strata-data/mtp/rt/experts.bin": {
+      "bytes": 707788800,
+      "mtime_ns": 1790631979074722076
+    }
+  },
+  "fingerprint": "2e6523450ecccd100b5f68c7af7d0eb13a4bafe9d787a07f598322e5f8ffa3f2",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "revision": "6f32ec070f23ced9f50e704d854d775da52591ab",
+  "git_status": "M  CMakeLists.txt\nM  docs/DETAILS.md\nM  src/prefill/prefill.cpp\n?? bench-expert-streaming-suite.sh\n?? bench-expert-streaming.sh\n?? bench/results/2026-10-04-streaming-5x5/\n?? docs/PREFILL_BENCHMARK_SUITE.md\n?? docs/PREFILL_PROFILING.md\n?? docs/benchmarks/2026-10-04-prefill-streaming.md\n?? src/prefill/profile.hpp\n?? tests/cuda/prefill_profile_test.cpp\n?? tools/bench_prefill_suite.py\n?? tools/prefill_profile.py\n?? tools/test_bench_prefill_suite.py\n?? tools/test_prefill_profile.py\n?? tools/test_prefill_streaming.py",
+  "created_utc": "2026-10-04T13:10:48.320228+00:00"
+}

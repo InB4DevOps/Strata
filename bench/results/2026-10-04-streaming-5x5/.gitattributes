@@ -1,0 +1,5 @@
+# Preserve the captured bytes referenced by the recorded SHA-256 hashes.
+cases/**/*.log -text -whitespace
+prompts/*.tokens -text
+# csv.writer emits standard CRLF records.
+summary.csv -text whitespace=cr-at-eol

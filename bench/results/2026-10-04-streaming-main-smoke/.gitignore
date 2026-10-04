@@ -1,0 +1,3 @@
+# Keep the synthetic engine logs; sampled binary tensors stay local (hashes are in JSON).
+!*.log
+*.residuals

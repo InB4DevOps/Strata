@@ -1,0 +1,438 @@
+{
+  "schema": 1,
+  "config": {
+    "exe": "/home/greg/Strata/engine/strata",
+    "args": [
+      "--pack",
+      "/home/greg/Strata-data/packs/coder-iq1_m",
+      "--native",
+      "/home/greg/Strata-data/models/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf",
+      "--ple-gguf",
+      "/home/greg/Strata-data/models/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00002-of-00002.gguf",
+      "--expert-profile",
+      "/home/greg/Strata/data/expert-profile-coder.bin",
+      "--expert-cache",
+      "auto",
+      "--prefill",
+      "auto",
+      "--spec",
+      "4",
+      "--mtp",
+      "/home/greg/Strata-data/mtp/rt",
+      "--max-context",
+      "262144",
+      "--kv",
+      "int8",
+      "--kv-resident",
+      "32768",
+      "--pcie-frac",
+      "0.00",
+      "--spec-min-p",
+      "0.70"
+    ],
+    "cwd": "/home/greg/Strata",
+    "tokenizer": "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer",
+    "model_name": "qwen3.8-flash-next-coder-iq1_m",
+    "log": "/home/greg/Strata/strata-coder-iq1_m.log",
+    "lib_dirs": [
+      "/usr/local/cuda/bin",
+      "/usr/local/cuda/lib64"
+    ],
+    "port": 8080,
+    "gpu": 0,
+    "gpus_asked": true,
+    "host": "0.0.0.0"
+  },
+  "config_path": "/home/greg/Strata/strata-coder-iq1_m.json",
+  "exe": "/home/greg/Strata/build/strata",
+  "exe_sha256": "ed25fdcb42418bb0321fcf1c54c2f56c1db3beedc9684d7015180d194a62e326",
+  "runner_sha256": "a55372c80e53a579ff2c5f79dbdeef49d66a07c5a939d3203e548521d0f549b1",
+  "cwd": "/home/greg/Strata",
+  "cases": [
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 4096,
+      "chunk": "256",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "1ec5825d4a3bac5099044ffc658476504ec49152798a56fd9ddfb4937d0dde7b",
+      "id": "528dab0d3c352aec"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 529,
+      "chunk": "256",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "e5c3e1d6232de8b34db9f52d0226f500758a162417dc3211cf684f6bda144ae0",
+      "id": "d1a730b8afdfc796"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 2048,
+      "chunk": "768",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "48ccb2c89e2a633964c6c8cb0a0833ec5ed388ef5f64d197abd7e91e4253ead9",
+      "id": "3a9b1d1ed900c79e"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 2048,
+      "chunk": "512",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "48ccb2c89e2a633964c6c8cb0a0833ec5ed388ef5f64d197abd7e91e4253ead9",
+      "id": "ba623112772fde30"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 1024,
+      "chunk": "128",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "13a6ead18b0e5be1df3884d561fd71555481920494d5bb7a5bcf8e7d95a1098c",
+      "id": "4edf32b1aa2d4333"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 2048,
+      "chunk": "128",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "48ccb2c89e2a633964c6c8cb0a0833ec5ed388ef5f64d197abd7e91e4253ead9",
+      "id": "b3f4cac1f95c5fed"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 1024,
+      "chunk": "512",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "13a6ead18b0e5be1df3884d561fd71555481920494d5bb7a5bcf8e7d95a1098c",
+      "id": "a66517b29a0ebf1c"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 256,
+      "chunk": "128",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "9486c404d60554721580618b4ac999b042310125d1260d2100f1fa07ae5ed81a",
+      "id": "ae0e4cc4f3ecf832"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 529,
+      "chunk": "512",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "e5c3e1d6232de8b34db9f52d0226f500758a162417dc3211cf684f6bda144ae0",
+      "id": "61aead522583cc3e"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 529,
+      "chunk": "768",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "e5c3e1d6232de8b34db9f52d0226f500758a162417dc3211cf684f6bda144ae0",
+      "id": "4e717c44f89fb8f8"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 256,
+      "chunk": "512",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "9486c404d60554721580618b4ac999b042310125d1260d2100f1fa07ae5ed81a",
+      "id": "9ca7a843bda40d94"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 256,
+      "chunk": "768",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "9486c404d60554721580618b4ac999b042310125d1260d2100f1fa07ae5ed81a",
+      "id": "feac08be8ec1aca0"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 256,
+      "chunk": "1024",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "9486c404d60554721580618b4ac999b042310125d1260d2100f1fa07ae5ed81a",
+      "id": "7b2e6f7b416379fa"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 4096,
+      "chunk": "1024",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "1ec5825d4a3bac5099044ffc658476504ec49152798a56fd9ddfb4937d0dde7b",
+      "id": "737850c1abd6d21c"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 4096,
+      "chunk": "512",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "1ec5825d4a3bac5099044ffc658476504ec49152798a56fd9ddfb4937d0dde7b",
+      "id": "b08927b8dfb4fc32"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 1024,
+      "chunk": "256",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "13a6ead18b0e5be1df3884d561fd71555481920494d5bb7a5bcf8e7d95a1098c",
+      "id": "4c29e412f1d7270f"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 529,
+      "chunk": "1024",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "e5c3e1d6232de8b34db9f52d0226f500758a162417dc3211cf684f6bda144ae0",
+      "id": "67d3de6864e37622"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 2048,
+      "chunk": "1024",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "48ccb2c89e2a633964c6c8cb0a0833ec5ed388ef5f64d197abd7e91e4253ead9",
+      "id": "1d844658a6bd7c21"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 4096,
+      "chunk": "768",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "1ec5825d4a3bac5099044ffc658476504ec49152798a56fd9ddfb4937d0dde7b",
+      "id": "1ac056efefc17e14"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 529,
+      "chunk": "128",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "e5c3e1d6232de8b34db9f52d0226f500758a162417dc3211cf684f6bda144ae0",
+      "id": "60ad79d6d4173e2c"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 1024,
+      "chunk": "1024",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "13a6ead18b0e5be1df3884d561fd71555481920494d5bb7a5bcf8e7d95a1098c",
+      "id": "f88185c0c7e143de"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 2048,
+      "chunk": "256",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "48ccb2c89e2a633964c6c8cb0a0833ec5ed388ef5f64d197abd7e91e4253ead9",
+      "id": "6af0926216d0099a"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 1024,
+      "chunk": "768",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "13a6ead18b0e5be1df3884d561fd71555481920494d5bb7a5bcf8e7d95a1098c",
+      "id": "be43a26ef09b892f"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 256,
+      "chunk": "256",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "9486c404d60554721580618b4ac999b042310125d1260d2100f1fa07ae5ed81a",
+      "id": "2722c9278d7e0b00"
+    },
+    {
+      "workload": "ramp",
+      "source": "synthetic",
+      "tokens": 4096,
+      "chunk": "128",
+      "memory": "config",
+      "kv": "config",
+      "expert_cache": "config",
+      "context": 4160,
+      "prompt_sha256": "1ec5825d4a3bac5099044ffc658476504ec49152798a56fd9ddfb4937d0dde7b",
+      "id": "be0dff3f723a6fe0"
+    }
+  ],
+  "rounds": 3,
+  "warmup_pairs": 1,
+  "check_residuals": false,
+  "seed": 1729,
+  "kv_resident": 0,
+  "timeout": 600,
+  "environment": {
+    "LD_LIBRARY_PATH": "/usr/local/cuda/bin:/usr/local/cuda/lib64:/usr/local/cuda/lib64",
+    "STRATA_STATE_HASH_GDN": "1"
+  },
+  "hardware": {
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700KF",
+    "logical_cpus": 20,
+    "nvidia": "NVIDIA GeForce RTX 3060, GPU-add57d0d-2bea-d200-0ea3-ee561b1e0fa8, 580.178.04, 00000000:01:00.0, 12288 MiB",
+    "amd": null,
+    "ram_bytes": 67262435328
+  },
+  "model_assets": {
+    "/home/greg/Strata-data/packs/coder-iq1_m/dense.bin": {
+      "bytes": 1475120640,
+      "mtime_ns": 1790806700861269022
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/index.txt": {
+      "bytes": 93633,
+      "mtime_ns": 1790806700862269040
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/native_experts.txt": {
+      "bytes": 3269,
+      "mtime_ns": 1790806701449018934
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/chat_template.jinja": {
+      "bytes": 9993,
+      "mtime_ns": 1790806701429279336
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/merges.txt": {
+      "bytes": 3353258,
+      "mtime_ns": 1790806701304277066
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/token_type.json": {
+      "bytes": 744960,
+      "mtime_ns": 1790806701312153333
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/tokenizer.json": {
+      "bytes": 541,
+      "mtime_ns": 1790806701312277212
+    },
+    "/home/greg/Strata-data/packs/coder-iq1_m/tokenizer/vocab.json": {
+      "bytes": 5737005,
+      "mtime_ns": 1790806701249276068
+    },
+    "/home/greg/Strata-data/models/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf": {
+      "bytes": 29608446496,
+      "mtime_ns": 1790806679375878870
+    },
+    "/home/greg/Strata-data/models/coder-IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00002-of-00002.gguf": {
+      "bytes": 28800138432,
+      "mtime_ns": 1790631687317408073
+    },
+    "/home/greg/Strata/data/expert-profile-coder.bin": {
+      "bytes": 98328,
+      "mtime_ns": 1790629844935809638
+    },
+    "/home/greg/Strata-data/mtp/rt/dense.bin": {
+      "bytes": 116099072,
+      "mtime_ns": 1790631979688733260
+    },
+    "/home/greg/Strata-data/mtp/rt/dense.txt": {
+      "bytes": 1851,
+      "mtime_ns": 1790631979689661038
+    },
+    "/home/greg/Strata-data/mtp/rt/draft_vocab.bin": {
+      "bytes": 425196,
+      "mtime_ns": 1790784879180776839
+    },
+    "/home/greg/Strata-data/mtp/rt/experts.bin": {
+      "bytes": 707788800,
+      "mtime_ns": 1790631979074722076
+    }
+  },
+  "fingerprint": "f7f1be4e006c92637f6255969b2d698b9ebc573b62885951b0cef532f76ee0db",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "revision": "4fa31ee4ecf6e7dbb5a9305e93dbd5be233015a5",
+  "git_status": "M CMakeLists.txt\n M docs/DETAILS.md\n M src/prefill/prefill.cpp\n?? bench-expert-streaming-suite.sh\n?? bench-expert-streaming.sh\n?? docs/PREFILL_BENCHMARK_SUITE.md\n?? docs/PREFILL_PROFILING.md\n?? docs/benchmarks/2026-10-04-prefill-streaming.md\n?? src/prefill/profile.hpp\n?? tests/cuda/prefill_profile_test.cpp\n?? tools/bench_prefill_suite.py\n?? tools/prefill_profile.py\n?? tools/test_bench_prefill_suite.py\n?? tools/test_prefill_profile.py\n?? tools/test_prefill_streaming.py",
+  "created_utc": "2026-10-04T12:03:13.922373+00:00"
+}
