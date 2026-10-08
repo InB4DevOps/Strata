@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <limits>
 
 namespace strata::core {
@@ -170,20 +171,34 @@ bool conversation_checkpoint_validate(const ConversationCheckpoint& c, const Ses
 }
 
 bool conversation_checkpoint_save(ConversationCheckpoint& c, const SessionState& ss,
-                                  const ModelGeometry& g, std::string& error) {
+                                  const ModelGeometry& g, std::string& error, ConversationCheckpointTiming* timing) {
     ConversationStateSizes z;
     if (!checkpoint_targets(ss, g, c.ids.size(), z, error)) return false;
     const size_t layers = owned_qsa(ss);
+    using Clock = std::chrono::steady_clock;
+    const auto start = timing ? Clock::now() : Clock::time_point{};
+    auto elapsed = [&](Clock::time_point from) {
+        return std::chrono::duration<double, std::milli>(Clock::now() - from).count();
+    };
     c.gdn.resize(z.gdn); c.ple.resize(ss.ple_hist ? z.ple : 0);
     c.tails.resize(layers * z.tail); c.dead.resize(layers * z.dead); c.block_pos.resize(layers * z.block_pos);
-    if (!copy(c.gdn.data(), ss.gdn_state, c.gdn.size(), error) ||
-        !copy(c.ple.data(), ss.ple_hist, c.ple.size(), error)) return false;
+    if (timing) {
+        timing->allocation_ms += elapsed(start);
+        timing->gdn_bytes += c.gdn.size(); timing->ple_bytes += c.ple.size();
+        timing->index_bytes += c.tails.size() + c.dead.size() + c.block_pos.size();
+    }
+    auto phase = timing ? Clock::now() : Clock::time_point{};
+    if (!copy(c.gdn.data(), ss.gdn_state, c.gdn.size(), error)) return false;
+    if (timing) { timing->gdn_ms += elapsed(phase); phase = Clock::now(); }
+    if (!copy(c.ple.data(), ss.ple_hist, c.ple.size(), error)) return false;
+    if (timing) { timing->ple_ms += elapsed(phase); phase = Clock::now(); }
     for (size_t j = 0; j < layers; ++j) {
         const auto& st = owned(ss, j);
         if (!copy(c.tails.data() + j * z.tail, st.idx_tail, z.tail, error) ||
             !copy(c.dead.data() + j * z.dead, st.idx_dead, z.dead, error) ||
             !copy(c.block_pos.data() + j * z.block_pos, st.idx_block_pos, z.block_pos, error)) return false;
     }
+    if (timing) timing->index_ms += elapsed(phase);
     return true;
 }
 
@@ -271,7 +286,7 @@ bool conversation_snapshot_capture_bytes(const ConversationKvReuse& reuse, const
 bool conversation_snapshot_save(SavedConversation& image, const ConversationView& view,
                                 const SessionState& ss, const ModelGeometry& g,
                                 const QsaState* draft, std::string& error,
-                                ConversationKvReuse reuse, size_t* reused_bytes) {
+                                ConversationKvReuse reuse, size_t* reused_bytes, bool copy_checkpoints) {
     size_t estimate = 0;
     if (!conversation_snapshot_capture_bytes(reuse, view, ss, g, draft, estimate, error) || !sync(error)) return false;
     // Build into a new object so a failure cannot publish a partial snapshot.
@@ -280,7 +295,8 @@ bool conversation_snapshot_save(SavedConversation& image, const ConversationView
     captured.geometry = geometry_key(g);
     captured.layer_lo = ss.layer_lo; captured.layer_hi = ss.layer_hi;
     captured.live.ids = view.ids; captured.live.imgs = view.images;
-    captured.cvec = view.cvec; captured.checkpoints = view.checkpoints;
+    captured.cvec = view.cvec;
+    if (copy_checkpoints) captured.checkpoints = view.checkpoints;
     const int64_t unchanged = reuse.kv.empty() ? 0 : reuse.unchanged_tokens;
     captured.kv = std::move(reuse.kv);
     const size_t layers = owned_qsa(ss);
@@ -392,9 +408,10 @@ bool conversation_snapshot_capture_bytes(const ConversationKvReuse& reuse, const
     return conversation_snapshot_capture_bytes(reuse, view, ss, g, &draft, bytes, error);
 }
 bool conversation_snapshot_save(SavedConversation& image, const ConversationView& view, const SessionState& ss,
-                                const ModelGeometry& g, const QsaState& draft, std::string& error,
-                                ConversationKvReuse reuse, size_t* reused_bytes) {
-    return conversation_snapshot_save(image, view, ss, g, &draft, error, std::move(reuse), reused_bytes);
+                                 const ModelGeometry& g, const QsaState& draft, std::string& error,
+                                 ConversationKvReuse reuse, size_t* reused_bytes, bool copy_checkpoints) {
+    return conversation_snapshot_save(image, view, ss, g, &draft, error, std::move(reuse), reused_bytes,
+                                      copy_checkpoints);
 }
 bool conversation_snapshot_validate(const SavedConversation& image, const SessionState& ss, const ModelGeometry& g,
                                     const QsaState& draft, std::string& error) {

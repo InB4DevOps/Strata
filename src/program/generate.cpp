@@ -1331,9 +1331,10 @@ ConvStateSizes conv_state_sizes(const strata::core::ModelGeometry& g, const stra
 }
 
 /// Copies the running state out (this session's carve only).  The caller has synchronized the device.
-bool checkpoint_save(ConvCheckpoint& c, const strata::core::SessionState& ss, const strata::core::ModelGeometry& g) {
+bool checkpoint_save(ConvCheckpoint& c, const strata::core::SessionState& ss, const strata::core::ModelGeometry& g,
+                     strata::core::ConversationCheckpointTiming* timing = nullptr) {
     std::string error;
-    if (strata::core::conversation_checkpoint_save(c, ss, g, error)) return true;
+    if (strata::core::conversation_checkpoint_save(c, ss, g, error, timing)) return true;
     std::fprintf(stderr, "strata serve: checkpoint save: %s\n", error.c_str());   // the caller's ERR has no reason
     return false;
 }
@@ -6936,7 +6937,7 @@ int main(int argc, char** argv) {
         };
         // Save only on a switch/rewind, not on each continuing request. No graph
         // addresses change: all parked images live in ordinary host vectors.
-        auto park_current_body = [&](size_t held) -> bool {
+        auto park_current_body = [&](size_t held, bool replace_checks) -> bool {
             if (!conversations.enabled() || !live_ok || live.empty()) return true;
             const auto estimate_t0 = Clock::now();
             // #342: before make_room evicts oldest-first, the copies of this conversation a turn back go (they hold
@@ -6948,6 +6949,10 @@ int main(int argc, char** argv) {
             // later stage (without it - the draft ring is saved once).  The checkpoints are MOVED apart into their
             // stage parts for the capture and put back together whichever way this ends (no running state copied).
             const size_t n_st = stages.size();
+            // Only transfer a chain the caller will replace/reset. A checkpoint rewind still needs its old chain.
+            const char* move_setting = std::getenv("STRATA_CHECKPOINT_MOVE");
+            const bool move_checks = replace_checks && n_st == 0 &&
+                                     (move_setting == nullptr || std::atoi(move_setting) != 0);
             // the draft layer's K/V lives on the last stage's GPU (the drafter is loaded there): with a split it is
             // saved with that stage's image, under its device; stage 0's image holds none
             const strata::core::QsaState* draft0 = n_st > 0 || !use_mtp ? nullptr : &mtp.kv_state();   // no --mtp: no draft K/V (snapshots accept null)
@@ -7031,12 +7036,18 @@ int main(int argc, char** argv) {
             try {
                 const uint64_t floor = (uint64_t) o.conversation_cache_min_free_mib * 1024 * 1024;
                 const size_t retained = reuse.bytes() + stage_retained;
+                size_t existing_checks = 0;
+                if (move_checks) {
+                    existing_checks = checks.capacity() * sizeof(ConvCheckpoint);
+                    for (const auto& ck : checks) existing_checks += ck.bytes();
+                }
                 const size_t additional = estimate > retained ? estimate - retained : 0;
+                const size_t new_bytes = additional > existing_checks ? additional - existing_checks : 0;
                 if (!strata::core::conversation_memory_admit(strata::core::conversation_available_memory(),
-                        additional, floor)) {
+                        new_bytes, floor)) {
                     std::fprintf(stderr, "strata serve: conversation cache: skip parking (physical RAM admission; need %zu MiB plus %lld MiB floor, or telemetry unavailable)\n",
-                                 additional >> 20, (long long) o.conversation_cache_min_free_mib);
-                    park_trace((int64_t) live.size(), estimate, fresh_estimate, retained, additional, held,
+                                 new_bytes >> 20, (long long) o.conversation_cache_min_free_mib);
+                    park_trace((int64_t) live.size(), estimate, fresh_estimate, retained, new_bytes, held,
                                std::chrono::duration<double, std::milli>(Clock::now() - t0).count(), estimate_ms,
                                capture_ms, stage_sync_ms, stage_capture_ms, put_ms, false);
                     return true;
@@ -7045,7 +7056,7 @@ int main(int argc, char** argv) {
                 size_t reused_bytes = 0;
                 const auto capture_t0 = Clock::now();
                 if (!strata::core::conversation_snapshot_save(image, view, ss, g, draft0, err,
-                        std::move(reuse), &reused_bytes)) return false;
+                        std::move(reuse), &reused_bytes, !move_checks)) return false;
                 capture_ms = std::chrono::duration<double, std::milli>(Clock::now() - capture_t0).count();
                 for (size_t k = 0; k < n_st; ++k) {   // the later stages (the last one with the draft layer's K/V)
                     auto& st = stages[k];
@@ -7064,20 +7075,27 @@ int main(int argc, char** argv) {
                 }
                 if (!strata::core::conversation_memory_admit(strata::core::conversation_available_memory(), 0, floor)) {
                     std::fprintf(stderr, "strata serve: conversation cache: skip parking (physical RAM floor after capture, or telemetry unavailable)\n");
-                    park_trace((int64_t) live.size(), estimate, fresh_estimate, retained, additional, held,
+                    park_trace((int64_t) live.size(), estimate, fresh_estimate, retained, new_bytes, held,
                                std::chrono::duration<double, std::milli>(Clock::now() - t0).count(), estimate_ms,
                                capture_ms, stage_sync_ms, stage_capture_ms, put_ms, false);
                     return true;
                 }
+                if (move_checks) image.checkpoints = std::move(checks);
                 const size_t snapshot_bytes = image.bytes();
                 const auto put_t0 = Clock::now();
-                const bool stored = conversations.put(std::move(image), held);
+                bool stored = false;
+                try { stored = conversations.put(std::move(image), held); }
+                catch (...) {
+                    if (move_checks) checks = std::move(image.checkpoints);
+                    throw;
+                }
+                if (!stored && move_checks) checks = std::move(image.checkpoints);
                 put_ms = std::chrono::duration<double, std::milli>(Clock::now() - put_t0).count();
                 const double park_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
                 std::fprintf(stderr, "strata serve: conversation cache: %s %zu tokens in %.1f ms; parked=%zu bytes=%zu evictions=%zu snapshot_bytes=%zu reused_kv_bytes=%zu\n",
                              stored ? "parked" : "skipped", live.size(), park_ms,
                              conversations.size(), conversations.bytes(), conversations.evictions(), snapshot_bytes, reused_bytes);
-                park_trace((int64_t) live.size(), estimate, fresh_estimate, retained, additional, held, park_ms,
+                park_trace((int64_t) live.size(), estimate, fresh_estimate, retained, new_bytes, held, park_ms,
                            estimate_ms, capture_ms, stage_sync_ms, stage_capture_ms, put_ms, stored);
             } catch (const std::bad_alloc&) {
                 // The active state has not been touched. Continue with normal
@@ -7088,8 +7106,8 @@ int main(int argc, char** argv) {
         };
         // #752: the whole park (the checkpoint split included) is under one try, so a host OOM skips parking instead of
         // ending the server
-        auto park_current = [&](size_t held) -> bool {
-            try { return park_current_body(held); }
+        auto park_current = [&](size_t held, bool replace_checks) -> bool {
+            try { return park_current_body(held, replace_checks); }
             catch (const std::bad_alloc&) {
                 std::fprintf(stderr, "strata serve: conversation cache: allocation failed; skip parking\n");
                 return true;
@@ -7126,11 +7144,12 @@ int main(int argc, char** argv) {
             return false;
         };
         auto checkpoint_at = [&](int64_t L, std::vector<ConvCheckpoint>* parts = nullptr, bool as_tail = false,
-                                 const char* kind = "periodic") -> bool {
+                                  const char* kind = "periodic") -> bool {
             ckpt_why.clear();
             if (o.prompt_cache <= 0 || L < 1) return true;
             const auto ck_t0 = Clock::now();
             double sync_ms = 0.0, copy_ms = 0.0, stage_sync_ms = 0.0, stage_copy_ms = 0.0;
+            strata::core::ConversationCheckpointTiming detail;
             for (ConvCheckpoint& c : checks)
                 if ((int64_t) c.ids.size() == L) {
                     c.used = ++check_clock;
@@ -7157,7 +7176,7 @@ int main(int argc, char** argv) {
                 if (!gpu_sync_ok()) return false;
                 sync_ms = std::chrono::duration<double, std::milli>(Clock::now() - phase_t0).count();
                 phase_t0 = Clock::now();
-                if (!checkpoint_save(c, ss, g)) return false;
+                if (!checkpoint_save(c, ss, g, pc_trace ? &detail : nullptr)) return false;
                 copy_ms = std::chrono::duration<double, std::milli>(Clock::now() - phase_t0).count();
                 for (auto& st : stages) {   // a layer split's later stages: their sessions' part
                     const strata::core::OnDevice on(st->dev);
@@ -7167,7 +7186,7 @@ int main(int argc, char** argv) {
                     if (!gpu_sync_ok()) return false;
                     stage_sync_ms += std::chrono::duration<double, std::milli>(Clock::now() - phase_t0).count();
                     phase_t0 = Clock::now();
-                    if (!checkpoint_save(part, st->ss, g)) return false;
+                    if (!checkpoint_save(part, st->ss, g, pc_trace ? &detail : nullptr)) return false;
                     stage_copy_ms += std::chrono::duration<double, std::milli>(Clock::now() - phase_t0).count();
                     c.stage_parts.push_back(std::move(part));
                 }
@@ -7214,11 +7233,15 @@ int main(int argc, char** argv) {
             }
             if (pc_trace) std::fprintf(stderr, "strata serve: prompt cache: checkpoint req=%lld kind=%s tokens=%lld "
                                  "save_ms=%.1f sync_ms=%.3f copy_ms=%.1f stage_sync_ms=%.3f stage_copy_ms=%.1f "
-                                 "kept=%zu evicted_kind=%s evicted_tokens=%lld\n",
+                                 "kept=%zu evicted_kind=%s evicted_tokens=%lld "
+                                 "alloc_ms=%.3f gdn_ms=%.3f ple_ms=%.3f index_ms=%.3f "
+                                 "gdn_bytes=%zu ple_bytes=%zu index_bytes=%zu\n",
                                  pc_req, kind, (long long) L,
                                  std::chrono::duration<double, std::milli>(Clock::now() - ck_t0).count(),
                                  sync_ms, copy_ms, stage_sync_ms, stage_copy_ms,
-                                 checks.size(), evicted_kind, (long long) evicted_tokens);
+                                 checks.size(), evicted_kind, (long long) evicted_tokens,
+                                 detail.allocation_ms, detail.gdn_ms, detail.ple_ms, detail.index_ms,
+                                 detail.gdn_bytes, detail.ple_bytes, detail.index_bytes);
             return true;
         };
         sp.on_chunk = [&](const float* R_rows, int64_t T, int64_t p0, std::string& e) -> bool {
@@ -9088,7 +9111,8 @@ int main(int argc, char** argv) {
                 resume == req_pin && live_ok)
                 for (const ConvCheckpoint& c : checks)
                     if ((int64_t) c.ids.size() == resume && c.pinned) pin_sibling = true;
-            if ((!from_live || incoming || slot_source >= 0) && !pin_sibling && !park_current(incoming ? incoming->bytes() : 0)) {
+            if ((!from_live || incoming || slot_source >= 0) && !pin_sibling &&
+                !park_current(incoming ? incoming->bytes() : 0, bool(incoming) || slot_source >= 0 || resume == 0)) {
                 std::printf("ERR %s\n", err.c_str());
                 return 1;
             }

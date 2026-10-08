@@ -93,6 +93,17 @@ int main() {
               "a full K/V rewrite still retains running-state allocations for overwrite");
     }
     {
+        ConversationCache cache(64, 1);
+        SavedConversation rejected = image({1,2,3});
+        ConversationCheckpoint checkpoint;
+        checkpoint.gdn.resize(128, 9);
+        rejected.checkpoints.push_back(std::move(checkpoint));
+        const uint8_t* original = rejected.checkpoints[0].gdn.data();
+        check(!cache.put(std::move(rejected)) && rejected.checkpoints[0].gdn.data() == original &&
+              rejected.checkpoints[0].gdn[0] == 9,
+              "a refused park leaves the moved checkpoint chain available for rollback");
+    }
+    {
         ConversationKv layer;
         layer.k.resize(400);
         std::vector<ConversationKv> layers;

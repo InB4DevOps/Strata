@@ -21,14 +21,15 @@ TOP_N = 10
 INT_FIELDS = {
     "decision": {"req", "prompt", "live", "checkpoint", "slot", "parked", "resume", "read_from",
                  "scan_entries", "scan_checkpoints", "images", "pin", "cvec_match", "ckpt"},
-    "checkpoint": {"req", "tokens", "kept", "evicted_tokens"},
+    "checkpoint": {"req", "tokens", "kept", "evicted_tokens", "gdn_bytes", "ple_bytes", "index_bytes"},
     "park": {"req", "tokens", "estimate_bytes", "fresh_estimate_bytes", "retained_bytes", "additional_bytes",
              "held_bytes", "stored"},
     "restore": {"req", "tokens", "bytes"},
 }
 FLOAT_FIELDS = {
     "decision": {"scan_ms"},
-    "checkpoint": {"save_ms", "sync_ms", "copy_ms", "stage_sync_ms", "stage_copy_ms"},
+    "checkpoint": {"save_ms", "sync_ms", "copy_ms", "stage_sync_ms", "stage_copy_ms",
+                   "alloc_ms", "gdn_ms", "ple_ms", "index_ms"},
     "park": {"save_ms", "estimate_ms", "capture_ms", "stage_sync_ms", "stage_capture_ms", "put_ms"},
     "restore": {"restore_ms"},
 }
@@ -112,6 +113,10 @@ def analyze(records: list[dict], files: list[str] | None = None) -> dict:
         "checkpoint_copy": sum(row.get("copy_ms", 0) for row in groups["checkpoint"]),
         "checkpoint_stage_sync": sum(row.get("stage_sync_ms", 0) for row in groups["checkpoint"]),
         "checkpoint_stage_copy": sum(row.get("stage_copy_ms", 0) for row in groups["checkpoint"]),
+        "checkpoint_allocation": sum(row.get("alloc_ms", 0) for row in groups["checkpoint"]),
+        "checkpoint_gdn": sum(row.get("gdn_ms", 0) for row in groups["checkpoint"]),
+        "checkpoint_ple": sum(row.get("ple_ms", 0) for row in groups["checkpoint"]),
+        "checkpoint_index": sum(row.get("index_ms", 0) for row in groups["checkpoint"]),
     }
     checkpoint_phases["checkpoint_other"] = sum(max(0, row.get("save_ms", 0) - row.get("sync_ms", 0) -
                                                          row.get("copy_ms", 0) - row.get("stage_sync_ms", 0) -
@@ -180,6 +185,9 @@ def format_text(report: dict) -> str:
          f"sync={phases['checkpoint_sync']:g} ms copy={phases['checkpoint_copy']:g} ms "
          f"stage_sync={phases['checkpoint_stage_sync']:g} ms "
          f"stage_copy={phases['checkpoint_stage_copy']:g} ms other={phases['checkpoint_other']:g} ms"),
+        ("Checkpoint copy detail: "
+         f"allocation={phases['checkpoint_allocation']:g} ms gdn={phases['checkpoint_gdn']:g} ms "
+         f"ple={phases['checkpoint_ple']:g} ms index={phases['checkpoint_index']:g} ms"),
         ("Park phases total: "
          f"estimate={phases['park_estimate']:g} ms capture={phases['park_capture']:g} ms "
          f"stage_sync={phases['park_stage_sync']:g} ms stage_capture={phases['park_stage_capture']:g} ms "
@@ -202,8 +210,10 @@ def format_text(report: dict) -> str:
             detail = f" basis={row['reread_basis']}" if key == "largest_rereads" else ""
             if key == "checkpoint_saves":
                 detail = (f" sync={row.get('sync_ms', 0):g} copy={row.get('copy_ms', 0):g}"
-                          f" stage_sync={row.get('stage_sync_ms', 0):g}"
-                          f" stage_copy={row.get('stage_copy_ms', 0):g}")
+                           f" stage_sync={row.get('stage_sync_ms', 0):g}"
+                           f" stage_copy={row.get('stage_copy_ms', 0):g}"
+                           f" alloc={row.get('alloc_ms', 0):g} gdn={row.get('gdn_ms', 0):g}"
+                           f" ple={row.get('ple_ms', 0):g} index={row.get('index_ms', 0):g}")
             elif key == "park_saves":
                 detail = (f" estimate={row.get('estimate_ms', 0):g} capture={row.get('capture_ms', 0):g}"
                           f" stage_sync={row.get('stage_sync_ms', 0):g}"

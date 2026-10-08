@@ -8,7 +8,8 @@
 #   BUILD_DIR=build-sycl tools/prompt_cache_trace.sh  # rebuild and run the SYCL engine
 #   CONFIG=strata-coder-iq1_m.json tools/prompt_cache_trace.sh
 #
-# Env: CONFIG, PYTHON, REBUILD, BUILD_DIR, CACHE_MIB, CACHE_SLOTS, PROMPT_CACHE, RUNNING_REUSE (default 1).
+# Env: CONFIG, PYTHON, REBUILD, BUILD_DIR, CACHE_MIB, CACHE_SLOTS, PROMPT_CACHE,
+#      RUNNING_REUSE, CHECKPOINT_MOVE (default 1).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,6 +23,7 @@ CACHE_MIB="${CACHE_MIB:-4096}"
 CACHE_SLOTS="${CACHE_SLOTS:-4}"
 PROMPT_CACHE="${PROMPT_CACHE:-6}"
 RUNNING_REUSE="${RUNNING_REUSE:-1}"
+CHECKPOINT_MOVE="${CHECKPOINT_MOVE:-1}"
 SCENARIO=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -105,8 +107,10 @@ START_OFFSET="$(log_offset)"
 
 export STRATA_PROMPT_CACHE_TRACE=1
 export STRATA_RUNNING_STATE_REUSE="$RUNNING_REUSE"
+export STRATA_CHECKPOINT_MOVE="$CHECKPOINT_MOVE"
 echo "cache configuration: ${CACHE_MIB} MiB, ${CACHE_SLOTS} parked slots, ${PROMPT_CACHE} prompt checkpoints"
 echo "running-state allocation reuse: ${RUNNING_REUSE}"
+echo "checkpoint-chain move on branch switch: ${CHECKPOINT_MOVE}"
 echo "starting server: $PYTHON serve/server.py --engine strata --config $TRACE_CONFIG --host 127.0.0.1 --port $PORT"
 ( cd "$ROOT" && "$PYTHON" serve/server.py --engine strata --config "$TRACE_CONFIG" --host 127.0.0.1 --port "$PORT" ) \
   >"$SERVER_LOG" 2>&1 &

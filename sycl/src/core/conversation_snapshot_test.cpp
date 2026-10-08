@@ -187,6 +187,19 @@ void full_session(int fmt, int mode, int experts) {
     fill(177);
     check(conversation_snapshot_save(b,view,ss,g,draft.state,err),"capture complete B");
     {
+        auto transferable = checkpoints;
+        const uint8_t* original = transferable[0].gdn.data();
+        const ConversationView moving{ids,images,transferable,true};
+        SavedConversation moved;
+        check(conversation_snapshot_save(moved,moving,ss,g,draft.state,err,{},nullptr,false) &&
+              moved.checkpoints.empty(),"capture leaves the replaceable checkpoint chain with its caller");
+        moved.checkpoints = std::move(transferable);
+        check(moved.checkpoints[0].gdn.data()==original && moved.checkpoints[0].gdn==b.checkpoints[0].gdn &&
+              moved.bytes()==b.bytes(),"checkpoint handoff moves buffers and preserves snapshot accounting");
+        check(conversation_snapshot_restore(moved,ss,g,draft.state,err)==ConversationRestore::restored,
+              "snapshot with moved checkpoint chain restores exactly");
+    }
+    {
         // disk save path: metadata + streamed K/V give the same file as the captured image
         SavedConversation meta;
         std::vector<SessionKvSource> sources;

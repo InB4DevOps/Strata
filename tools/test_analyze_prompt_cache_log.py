@@ -31,7 +31,8 @@ class Parsing(unittest.TestCase):
     def test_parses_every_event_format(self):
         lines = [
             ("checkpoint req=1 kind=periodic tokens=200 save_ms=3.25 sync_ms=.25 copy_ms=2.5 "
-             "stage_sync_ms=.1 stage_copy_ms=.2 kept=2 evicted_kind=old evicted_tokens=90",
+             "stage_sync_ms=.1 stage_copy_ms=.2 alloc_ms=.4 gdn_ms=1.2 ple_ms=.3 index_ms=.6 "
+             "gdn_bytes=128 ple_bytes=32 index_bytes=64 kept=2 evicted_kind=old evicted_tokens=90",
              "checkpoint"),
             ("park req=2 tokens=180 estimate_bytes=1000 fresh_estimate_bytes=900 retained_bytes=700 "
              "additional_bytes=200 held_bytes=800 save_ms=4.5 estimate_ms=.2 capture_ms=3 "
@@ -87,6 +88,7 @@ class Analysis(unittest.TestCase):
         phases = report["summary"]["phase_totals_ms"]
         self.assertEqual(phases["checkpoint_sync"], 1)
         self.assertEqual(phases["checkpoint_copy"], 5)
+        self.assertEqual(phases["checkpoint_allocation"], 0)
         self.assertEqual(phases["park_capture"], 6)
         self.assertEqual(phases["park_put"], .3)
 
@@ -96,6 +98,14 @@ class Analysis(unittest.TestCase):
         self.assertEqual(summary["unclassified"], 1)
         self.assertEqual(summary["reuse_rate"], 0)
         self.assertIsNone(ANALYZER.analyze([])["summary"]["reuse_rate"])
+
+    def test_checkpoint_copy_detail_is_aggregated(self):
+        row = ANALYZER.parse_line(f"{PREFIX} checkpoint req=1 alloc_ms=2 gdn_ms=3 ple_ms=4 "
+                                  "index_ms=5 gdn_bytes=128 ple_bytes=32 index_bytes=16")
+        phases = ANALYZER.analyze([row])["summary"]["phase_totals_ms"]
+        self.assertEqual((phases["checkpoint_allocation"], phases["checkpoint_gdn"],
+                          phases["checkpoint_ple"], phases["checkpoint_index"]), (2, 3, 4, 5))
+        self.assertEqual((row["gdn_bytes"], row["ple_bytes"], row["index_bytes"]), (128, 32, 16))
 
     def test_text_names_each_hot_spot_section(self):
         text = ANALYZER.format_text(ANALYZER.analyze(self.records()))
