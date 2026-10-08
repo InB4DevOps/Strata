@@ -112,6 +112,24 @@ bool metadata_bytes(const ConversationCheckpoint& c, size_t& total) {
         if (!add(total, n)) return false;
     return true;
 }
+
+bool running_reuse_bytes(const ConversationCheckpoint& c, const SessionState& ss, const ModelGeometry& g,
+                         size_t& fresh, size_t& retained, std::string& error) {
+    fresh = retained = 0;
+    if (c.gdn.empty() && c.ple.empty() && c.tails.empty() && c.dead.empty() && c.block_pos.empty()) return true;
+    ConversationStateSizes z;
+    if (!conversation_session_sizes(g, ss, z, error)) return false;
+    const size_t layers = owned_qsa(ss);
+    if (!c.ids.empty() || !c.imgs.empty() || !c.stage_parts.empty() || c.gdn.size() != z.gdn ||
+        c.ple.size() != (ss.ple_hist ? z.ple : 0) || c.tails.size() != layers * z.tail ||
+        c.dead.size() != layers * z.dead || c.block_pos.size() != layers * z.block_pos)
+        return fail(error, "invalid reusable running-state buffers");
+    for (size_t n : {z.gdn, ss.ple_hist ? z.ple : 0, layers * z.tail, layers * z.dead, layers * z.block_pos})
+        if (!add(fresh, n)) return fail(error, "running-state byte count overflow");
+    for (size_t n : {c.gdn.capacity(), c.ple.capacity(), c.tails.capacity(), c.dead.capacity(), c.block_pos.capacity()})
+        if (!add(retained, n)) return fail(error, "retained running-state byte count overflow");
+    return true;
+}
 } // namespace
 
 bool conversation_state_sizes(const ModelGeometry& g, ConversationStateSizes& z, std::string& error) {
@@ -234,6 +252,12 @@ bool conversation_snapshot_capture_bytes(const ConversationKvReuse& reuse, const
                                          const SessionState& ss, const ModelGeometry& g,
                                          const QsaState* draft, size_t& bytes, std::string& error) {
     if (!conversation_snapshot_bytes(view, ss, g, draft, bytes, error)) return false;
+    size_t fresh_running = 0, retained_running = 0;
+    if (!running_reuse_bytes(reuse.running, ss, g, fresh_running, retained_running, error)) return false;
+    if (retained_running) {
+        bytes -= fresh_running;
+        if (!add(bytes, retained_running)) return fail(error, "retained running-state allocation overflow");
+    }
     if (reuse.kv.empty()) return true;
     const size_t layers = owned_qsa(ss) + (draft ? 1 : 0);
     if (reuse.kv.size() != layers || reuse.unchanged_tokens < 0 ||
@@ -263,6 +287,7 @@ bool conversation_snapshot_save(SavedConversation& image, const ConversationView
     if (!conversation_snapshot_capture_bytes(reuse, view, ss, g, draft, estimate, error) || !sync(error)) return false;
     // Build into a new object so a failure cannot publish a partial snapshot.
     SavedConversation captured;
+    captured.live = std::move(reuse.running);
     captured.geometry = geometry_key(g);
     captured.layer_lo = ss.layer_lo; captured.layer_hi = ss.layer_hi;
     captured.live.ids = view.ids; captured.live.imgs = view.images;
