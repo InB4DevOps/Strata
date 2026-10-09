@@ -12,17 +12,19 @@ import subprocess
 def run(binary, flag, value, tile):
     env = {k: v for k, v in os.environ.items() if not k.startswith("STRATA_")}
     env.update({flag: value, "STRATA_PF_FUSED_TILE": str(tile)})
-    result = subprocess.run([str(binary), "--no-timing"], env=env, text=True,
+    result = subprocess.run([str(binary), "--only=IQ", "--chunks=2048"], env=env, text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=600)
     print(result.stdout, end="", flush=True)
     if result.returncode == 77:
         raise SystemExit(77)
     result.check_returncode()
-    hashes = [line for line in result.stdout.splitlines() if line.startswith("EXACT_HASH ")]
+    hashes = [line.strip() for line in result.stdout.splitlines() if "fused output bits hash " in line]
     if len(hashes) != 6:
         raise RuntimeError("expected fingerprints for all six format pairs")
     if value == "1" and flag + "=1" not in result.stdout:
-        raise RuntimeError("the requested CUDA variant did not report activation")
+        if "inactive: requires SM86" in result.stdout:
+            raise SystemExit(77)
+        raise RuntimeError("the requested CUDA variant did not report activation; enable its SM86 CMake option")
     return hashes
 
 

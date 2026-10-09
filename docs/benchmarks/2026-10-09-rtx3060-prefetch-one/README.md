@@ -2,10 +2,19 @@
 
 ## Change and scope
 
+Build with **`-DSTRATA_CUDA_SM86_PREFETCH_ONE=ON -DCMAKE_CUDA_ARCHITECTURES=86`**.
+The CMake option is off by default and exists only in the CUDA/native build branch.
+It substitutes a CUDA-only translation unit; the shared `moe_fused_iq.cu` and
+shared test file are byte-identical to upstream. The HIP CMake branch and SYCL
+build are unchanged. A runtime capability check permits the optimized kernel only
+on compute capability 8.6; other CUDA devices use the included original implementation
+(provided the build targets their architecture). SM86 includes other Ampere cards;
+the performance measurements here are specifically from the RTX 3060.
+
 `STRATA_PF_FUSED=1 STRATA_PF_PREFETCH_ONE=1` selects a one-superblock gate/up weight
 prefetch distance. The existing two-superblock kernel is the default. Activation
 pipeline depth, tile selection, down-weight prefetch, expert residency and decode
-are not changed. The opt-in is CUDA-only; HIP keeps its existing path. SYCL builds
+are not changed. The runtime flag has no effect in default builds. HIP keeps its existing path. SYCL builds
 a separate fused-prefill stub and does not compile this implementation.
 
 This is independent of the IQ3 two-stage proposal. The two switches have not been
@@ -73,17 +82,35 @@ IDs. It is **not** the gain from this patch or proof of quality equivalence with
 No decode improvement, default-setting change, other-GPU/model benefit, full-160K
 prompt benefit, or Windows performance is established here.
 
-## Validation and reproduction
+## CUDA-only isolation and validation
 
-The source/test file is also built by HIP. Local HIP configure attempts stopped
-before compilation with **`Failed to find ROCm root directory`**. The PR remains
-draft pending that affected-backend build; no HIP or Windows runtime pass is claimed.
+The first draft edited a shared CUDA/HIP file and was blocked on a missing ROCm
+toolchain. The current revision restores that file and the shared test exactly to
+upstream. It adds only CUDA-specific source selected inside the CUDA CMake branch;
+there is no longer a HIP implementation change to build. No AMD speedup is claimed.
+Windows and other GPU hardware have not been tested.
+
+The specialized kernel body lives in `src/prefill/cuda/native_fused_iq_sm86.cuh`;
+conversion, routing and fallback code are reused by including the unchanged
+original translation unit under fallback entry-point names. The tradeoff is a
+separate SM86 kernel body whose arithmetic must stay in sync with the original.
+The parity wrapper compares the existing test's canonical output fingerprints;
+it no longer requires any changes to the shared C++ test.
+
+Default-off and enabled CUDA builds are checked separately. Configuration rejects
+the opt-in without architecture 86, or both independent SM86 variants enabled
+together. `cuda-only-evidence.json` and `cuda-only-parity.log` record validation
+of this source layout; the earlier `evidence.json`/`isolated-parity.log` are retained
+as history, not represented as tests of the new layout.
+
+## Reproduction
 
 CUDA build (use the pinned llama.cpp checkout installed by setup):
 
 ```sh
 cmake -S . -B build-prefetch -DSTRATA_ENABLE_CUDA=ON -DSTRATA_BUILD_TESTS=ON \
-  -DSTRATA_GGML_DIR=/path/to/llama.cpp -DCMAKE_CUDA_ARCHITECTURES=86 -DCMAKE_BUILD_TYPE=Release
+  -DSTRATA_GGML_DIR=/path/to/llama.cpp -DCMAKE_CUDA_ARCHITECTURES=86 -DCMAKE_BUILD_TYPE=Release \
+  -DSTRATA_CUDA_SM86_PREFETCH_ONE=ON
 cmake --build build-prefetch --target strata prefill_fused_iq_test -j 4
 python tools/test_cuda_prefill_variant.py build-prefetch/prefill_fused_iq_test \
   --flag STRATA_PF_PREFETCH_ONE
@@ -92,9 +119,10 @@ python tools/test_cuda_prefill_variant.py build-prefetch/prefill_fused_iq_test \
 The wrapper launches fresh off/on processes for both 64/128-row tiles, checks the
 opt-in activation message, and compares complete output fingerprints for all six
 format pairs. The executable also retains its FP64/MMQ numerical checks. It exits
-77 without a supported CUDA device; that is a skip, not a pass. The final isolated
-validation additionally compared the disabled fingerprints to the retained prior
-build via `--reference-binary`; see `isolated-parity.log`.
+77 without a supported SM86 CUDA device; that is a skip, not a pass. The CUDA-only
+validation additionally compares disabled output to a build with the CMake option
+off via `--reference-binary`; see `cuda-only-parity.log`. The earlier isolated
+validation used a prior instrumented build and is retained in `isolated-parity.log`.
 
 For fixed-work timings, run `prefill_fused_iq_test --no-ref --chunks=2048,4096,8192`
 in alternating fresh processes with this flag unset/set to 1. Do not combine

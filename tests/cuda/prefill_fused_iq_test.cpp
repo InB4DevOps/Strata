@@ -341,13 +341,6 @@ void reference_part(const Pair& p, cudaStream_t s) {
                              y_f = download(fb.dm, (size_t) rows * N);
     delete mbp;
     const std::vector<int32_t> slot = download_i(fb.slot, (size_t) rows), fsrc = download_i(fb.src, (size_t) rows);
-    // Pair order is stable even when atomic grouping assigns different physical rows.
-    uint64_t hash = 14695981039346656037ull;
-    for (int32_t row : slot) {
-        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(y_f.data() + (size_t) row * N);
-        for (size_t i = 0; i < N * sizeof(float); ++i) hash = (hash ^ bytes[i]) * 1099511628211ull;
-    }
-    std::printf("EXACT_HASH %s tokens=%d %016llx\n", p.name, T, (unsigned long long) hash);
     for (int64_t i = 0; i < rows; ++i)
         if (fsrc[(size_t) slot[(size_t) i]] != (int32_t) (i / K)) throw std::runtime_error("group: slot/src disagree");
 
