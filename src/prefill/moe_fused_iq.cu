@@ -425,7 +425,7 @@ template <int T> __device__ __forceinline__ const void* grid_src() {
 // tokens' activations, SwiGLU, H to int8 per 32 features into `out`.  !GU: down rows (format WT) against H, FP32 into
 // `dm`.  Warp (wf, wt): weight rows 64 wf.. as four m16 tiles (GU: a tile = 8 features, gate rows as mma rows 0-7 and
 // up rows as 8-15, so a lane holds gate and up of one feature), routed rows 16 wt.. as two n8.
-template <int WT, bool GU, int WW>
+template <int WT, bool GU, int WW, int PF = 2>
 __global__ void __launch_bounds__(THREADS, 1)
 native_kernel(const Batch b, const NativeGeom geo, const Tables tb, const uint8_t* __restrict__ act,
               const int32_t* __restrict__ src, uint8_t* __restrict__ out, float* __restrict__ dm) {
@@ -485,7 +485,6 @@ native_kernel(const Batch b, const NativeGeom geo, const Tables tb, const uint8_
         // the weight bytes into L2 ahead of the register loads (one stage ahead only - less than a DRAM round trip):
         // gate/up PF super-blocks ahead (the row's two threads take a block's first and last line), down the whole row
         // slice at once (180 or 360 bytes a row)
-        constexpr int PF = 2;
         auto prefetch_sb = [&](int sb) {
             if (dec && sb < GU_ROWS_K / 256) pf_l2(wrow + sb * BS + (uj ? BS - 1 : 0));
         };
@@ -910,20 +909,35 @@ std::mutex g_mu;
 DevInfo g_dev[32];
 
 #if !defined(__HIPCC__)
-template <int T, bool GU, int WW> bool setup_ww(int& occ) {
+// CUDA only; the original two-superblock kernel remains the default.
+bool prefetch_one() {
+    static const bool on = [] {
+        const char* v = std::getenv("STRATA_PF_PREFETCH_ONE");
+        const bool enabled = v != nullptr && std::strcmp(v, "1") == 0;
+        if (enabled) std::fprintf(stderr, "prefill fused native: STRATA_PF_PREFETCH_ONE=1 (gate/up lookahead one superblock)\n");
+        return enabled;
+    }();
+    return on;
+}
+template <int T, bool GU, int WW, int PF = 2> bool setup_ww(int& occ) {
     cudaFuncAttributes fa{};
-    if (cudaFuncGetAttributes(&fa, native_kernel<T, GU, WW>) != cudaSuccess || fa.ptxVersion < 80) return false;
-    if (cudaFuncSetAttribute(native_kernel<T, GU, WW>, cudaFuncAttributeMaxDynamicSharedMemorySize,
+    if (cudaFuncGetAttributes(&fa, native_kernel<T, GU, WW, PF>) != cudaSuccess || fa.ptxVersion < 80) return false;
+    if (cudaFuncSetAttribute(native_kernel<T, GU, WW, PF>, cudaFuncAttributeMaxDynamicSharedMemorySize,
                              (int) smem_bytes(T, WW)) != cudaSuccess)
         return false;
     int o = 0;
-    if (cudaOccupancyMaxActiveBlocksPerMultiprocessor(&o, native_kernel<T, GU, WW>, THREADS, smem_bytes(T, WW)) !=
+    if (cudaOccupancyMaxActiveBlocksPerMultiprocessor(&o, native_kernel<T, GU, WW, PF>, THREADS, smem_bytes(T, WW)) !=
             cudaSuccess || o < 1)
         return false;
     occ = std::min(occ, o);
     return true;
 }
-template <int T, bool GU> bool setup_one(int& occ) { return setup_ww<T, GU, 4>(occ) && setup_ww<T, GU, 2>(occ); }
+template <int T, bool GU> bool setup_one(int& occ) {
+    if constexpr (GU) {
+        if (prefetch_one()) return setup_ww<T, GU, 4, 1>(occ) && setup_ww<T, GU, 2, 1>(occ);
+    }
+    return setup_ww<T, GU, 4>(occ) && setup_ww<T, GU, 2>(occ);
+}
 #endif
 
 #if defined(__HIPCC__)
@@ -1008,13 +1022,24 @@ bool d_covered(int t) {
         ;
 }
 
-template <int T, bool GU>
-void launch(int ww, unsigned grid, const Batch& b, const NativeGeom& g, const Tables& tb, const void* act,
+template <int T, bool GU, int PF = 2>
+void launch_variant(int ww, unsigned grid, const Batch& b, const NativeGeom& g, const Tables& tb, const void* act,
             const int32_t* src, void* out, float* dm, cudaStream_t s) {
     const uint8_t* a = (const uint8_t*) act;
     uint8_t* o = (uint8_t*) out;
-    if (ww == 4) native_kernel<T, GU, 4><<<grid, THREADS, smem_bytes(T, 4), s>>>(b, g, tb, a, src, o, dm);
-    else native_kernel<T, GU, 2><<<grid, THREADS, smem_bytes(T, 2), s>>>(b, g, tb, a, src, o, dm);
+    if (ww == 4) native_kernel<T, GU, 4, PF><<<grid, THREADS, smem_bytes(T, 4), s>>>(b, g, tb, a, src, o, dm);
+    else native_kernel<T, GU, 2, PF><<<grid, THREADS, smem_bytes(T, 2), s>>>(b, g, tb, a, src, o, dm);
+}
+
+template <int T, bool GU>
+void launch(int ww, unsigned grid, const Batch& b, const NativeGeom& g, const Tables& tb, const void* act,
+            const int32_t* src, void* out, float* dm, cudaStream_t s) {
+#if !defined(__HIPCC__)
+    if constexpr (GU) {
+        if (prefetch_one()) return launch_variant<T, GU, 1>(ww, grid, b, g, tb, act, src, out, dm, s);
+    }
+#endif
+    launch_variant<T, GU>(ww, grid, b, g, tb, act, src, out, dm, s);
 }
 
 // The work item's shape for a layer of `n` routed rows over `n_expert` experts: 128 routed rows when an expert has
