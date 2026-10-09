@@ -2,6 +2,14 @@
 
 ## Change and scope
 
+Build with **`-DSTRATA_CUDA_SM86_IQ3_STAGE2=ON -DCMAKE_CUDA_ARCHITECTURES=86`**.
+This off-by-default option is declared only in the CUDA/native build branch and
+selects a CUDA-only translation unit. The shared kernel/test files, HIP CMake
+branch and SYCL build remain byte-identical to upstream. The optimized path also
+requires runtime compute capability 8.6; other CUDA devices take the original
+implementation when supported by the build. SM86 is broader than the RTX 3060;
+performance evidence here covers that card only.
+
 `STRATA_PF_FUSED=1 STRATA_PF_IQ3_STAGE2=1` uses two activation-buffer stages only
 for **IQ3_S/IQ4_NL and IQ3_XXS/IQ4_NL gate/up–down pairs**. Both gate/up and down
 take the selected family. Every other pair, and the default with the flag absent
@@ -77,15 +85,29 @@ No combined-prefetch/stage test, normal-MMQ comparison specific to this selector
 other-card/model claim, Windows measurement or new decode benefit is established.
 The prototype's old global stages=2 result must not be attributed to this selector.
 
-## Validation and reproduction
+## CUDA-only isolation and validation
 
-HIP also compiles this source/test file. Local HIP configure attempts stopped
-before compilation with **`Failed to find ROCm root directory`**; this is a pending
-review gate, not a build pass. The PR stays draft. Windows runtime is untested.
+The initial shared-file draft was blocked on the absent ROCm toolchain. This
+revision restores the original shared kernel and test, removing that HIP change.
+Only the CUDA CMake branch selects the new source. No AMD performance or new HIP
+runtime validation is claimed. Windows and other GPU hardware remain untested.
+
+The CUDA-only kernel specialization shares conversion/routing helpers and its
+fallback with the unchanged original translation unit. Its separate kernel body
+must preserve the original arithmetic; the Python wrapper compares the stock
+test's existing canonical fingerprints without editing the shared C++ test.
+
+Default-off and opt-in builds are checked separately; enabling without architecture
+86 or enabling both independent SM86 variants together is rejected. New-layout
+validation is in `cuda-only-evidence.json`/`cuda-only-parity.log`; earlier isolated
+evidence is retained separately as history.
+
+## Reproduction
 
 ```sh
 cmake -S . -B build-iq3-stage -DSTRATA_ENABLE_CUDA=ON -DSTRATA_BUILD_TESTS=ON \
-  -DSTRATA_GGML_DIR=/path/to/llama.cpp -DCMAKE_CUDA_ARCHITECTURES=86 -DCMAKE_BUILD_TYPE=Release
+  -DSTRATA_GGML_DIR=/path/to/llama.cpp -DCMAKE_CUDA_ARCHITECTURES=86 -DCMAKE_BUILD_TYPE=Release \
+  -DSTRATA_CUDA_SM86_IQ3_STAGE2=ON
 cmake --build build-iq3-stage --target strata prefill_fused_iq_test -j 4
 python tools/test_cuda_prefill_variant.py build-iq3-stage/prefill_fused_iq_test \
   --flag STRATA_PF_IQ3_STAGE2
@@ -93,9 +115,10 @@ python tools/test_cuda_prefill_variant.py build-iq3-stage/prefill_fused_iq_test 
 
 The wrapper compares all six supported format pairs, both tile sizes, in fresh
 off/on processes and requires the activation message. It also supports a prior
-instrumented build via `--reference-binary`, used for the final disabled-path
-comparison in `isolated-parity.log`. The executable retains its FP64/MMQ reference
-checks. Exit 77 means no supported CUDA device and must not be counted as a pass.
+build via `--reference-binary`, used to compare against a default-off build in
+`cuda-only-parity.log`. The earlier instrumented-build check is preserved in
+`isolated-parity.log`. The executable retains its FP64/MMQ reference checks.
+Exit 77 means no supported SM86 CUDA device and must not be counted as a pass.
 
 Run `prefill_fused_iq_test --no-ref --chunks=2048,4096,8192` with the flag unset/set
 in alternating processes for the fixed-work matrix. For inference, use the exact
