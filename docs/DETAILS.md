@@ -28,6 +28,13 @@ argmax run on thread-block clusters (RTX 50, sm_90+; other cards keep the previo
 IQ3 packs about even); `STRATA_QSA_CLUSTER=0` / `STRATA_ARGMAX_MULTI=0` turn the decode kernels off. The tables
 below are 0.1.26's.
 
+**CUDA native fused prefill, opt-in `STRATA_PF_IQ3_STAGE2=1`:** with `STRATA_PF_FUSED=1`,
+IQ3_S or IQ3_XXS gate/up paired with IQ4_NL down use two activation-buffer stages;
+every other format pair retains four. On an RTX 3060 12 GB at 100 W with an i7-12700KF,
+the experimental selector improved three 12K–31K code/documentation prompts by
+0.20–0.30% with matching output IDs (six paired runs each). The default stays off.
+[Measurement, format tradeoffs and validation](benchmarks/2026-10-09-rtx3060-iq3-stage2/README.md).
+
 ### Prompt processing (tokens/s)
 
 | Model | 1K | 4K | 32K | 64K | 128K | 262K |

@@ -90,8 +90,8 @@ __host__ __device__ constexpr int grid_bytes(int t) {
     return t == T_IQ2_XXS ? 256 * 8 : t == T_IQ2_XS ? 512 * 8 : t == T_IQ2_S ? 1024 * 8 : t == T_IQ3_XXS ? 256 * 4
          : t == T_IQ3_S ? 512 * 4 : 0;
 }
-__host__ __device__ constexpr size_t smem_bytes(int t, int ww) {
-    return (size_t) 2 * weight_rows(ww) * (WLD + 16) + (size_t) ASTAGES * tile_rows(ww) * AB +
+__host__ __device__ constexpr size_t smem_bytes(int t, int ww, int stages = ASTAGES) {
+    return (size_t) 2 * weight_rows(ww) * (WLD + 16) + (size_t) stages * tile_rows(ww) * AB +
            (size_t) tile_rows(ww) * 4 + grid_bytes(t);
 }
 
@@ -425,11 +425,12 @@ template <int T> __device__ __forceinline__ const void* grid_src() {
 // tokens' activations, SwiGLU, H to int8 per 32 features into `out`.  !GU: down rows (format WT) against H, FP32 into
 // `dm`.  Warp (wf, wt): weight rows 64 wf.. as four m16 tiles (GU: a tile = 8 features, gate rows as mma rows 0-7 and
 // up rows as 8-15, so a lane holds gate and up of one feature), routed rows 16 wt.. as two n8.
-template <int WT, bool GU, int WW>
+template <int WT, bool GU, int WW, int STAGES = 4>
 __global__ void __launch_bounds__(THREADS, 1)
 native_kernel(const Batch b, const NativeGeom geo, const Tables tb, const uint8_t* __restrict__ act,
               const int32_t* __restrict__ src, uint8_t* __restrict__ out, float* __restrict__ dm) {
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
+    constexpr int ASTAGES = STAGES;
     constexpr int TR = tile_rows(WW), WR = weight_rows(WW);
     constexpr int WT_BYTES = WR * WLD, WS_FLOATS = WR * 4, ACT_STAGE = TR * AB;
     constexpr int NS = (GU ? GU_ROWS_K : D_ROWS_K) / 64;   // 64-value stages along K
@@ -910,18 +911,38 @@ std::mutex g_mu;
 DevInfo g_dev[32];
 
 #if !defined(__HIPCC__)
-template <int T, bool GU, int WW> bool setup_ww(int& occ) {
+bool iq3_stage2() {
+    static const bool on = [] {
+        const char* v = std::getenv("STRATA_PF_IQ3_STAGE2");
+        const bool enabled = v != nullptr && std::strcmp(v, "1") == 0;
+        if (enabled) std::fprintf(stderr, "prefill fused native: STRATA_PF_IQ3_STAGE2=1 (IQ3_S/IQ3_XXS with IQ4_NL down)\n");
+        return enabled;
+    }();
+    return on;
+}
+// Only the measured IQ3_S/IQ4_NL and IQ3_XXS/IQ4_NL pairs use two stages.
+// Their gate/up and down kernels also retain four-stage instances for other pairs.
+template <int T, bool GU>
+constexpr bool stage2_kernel = GU ? (T == T_IQ3_S || T == T_IQ3_XXS) : T == T_IQ4_NL;
+
+template <int T, bool GU, int WW, int AS = 4> bool setup_variant(int& occ) {
     cudaFuncAttributes fa{};
-    if (cudaFuncGetAttributes(&fa, native_kernel<T, GU, WW>) != cudaSuccess || fa.ptxVersion < 80) return false;
-    if (cudaFuncSetAttribute(native_kernel<T, GU, WW>, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                             (int) smem_bytes(T, WW)) != cudaSuccess)
+    if (cudaFuncGetAttributes(&fa, native_kernel<T, GU, WW, AS>) != cudaSuccess || fa.ptxVersion < 80) return false;
+    if (cudaFuncSetAttribute(native_kernel<T, GU, WW, AS>, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             (int) smem_bytes(T, WW, AS)) != cudaSuccess)
         return false;
     int o = 0;
-    if (cudaOccupancyMaxActiveBlocksPerMultiprocessor(&o, native_kernel<T, GU, WW>, THREADS, smem_bytes(T, WW)) !=
+    if (cudaOccupancyMaxActiveBlocksPerMultiprocessor(&o, native_kernel<T, GU, WW, AS>, THREADS, smem_bytes(T, WW, AS)) !=
             cudaSuccess || o < 1)
         return false;
     occ = std::min(occ, o);
     return true;
+}
+template <int T, bool GU, int WW> bool setup_ww(int& occ) {
+    if constexpr (stage2_kernel<T, GU>) {
+        if (iq3_stage2() && !setup_variant<T, GU, WW, 2>(occ)) return false;
+    }
+    return setup_variant<T, GU, WW>(occ);
 }
 template <int T, bool GU> bool setup_one(int& occ) { return setup_ww<T, GU, 4>(occ) && setup_ww<T, GU, 2>(occ); }
 #endif
@@ -1008,13 +1029,25 @@ bool d_covered(int t) {
         ;
 }
 
-template <int T, bool GU>
-void launch(int ww, unsigned grid, const Batch& b, const NativeGeom& g, const Tables& tb, const void* act,
+template <int T, bool GU, int AS = 4>
+void launch_variant(int ww, unsigned grid, const Batch& b, const NativeGeom& g, const Tables& tb, const void* act,
             const int32_t* src, void* out, float* dm, cudaStream_t s) {
     const uint8_t* a = (const uint8_t*) act;
     uint8_t* o = (uint8_t*) out;
-    if (ww == 4) native_kernel<T, GU, 4><<<grid, THREADS, smem_bytes(T, 4), s>>>(b, g, tb, a, src, o, dm);
-    else native_kernel<T, GU, 2><<<grid, THREADS, smem_bytes(T, 2), s>>>(b, g, tb, a, src, o, dm);
+    if (ww == 4) native_kernel<T, GU, 4, AS><<<grid, THREADS, smem_bytes(T, 4, AS), s>>>(b, g, tb, a, src, o, dm);
+    else native_kernel<T, GU, 2, AS><<<grid, THREADS, smem_bytes(T, 2, AS), s>>>(b, g, tb, a, src, o, dm);
+}
+
+template <int T, bool GU>
+void launch(int ww, unsigned grid, const Batch& b, const NativeGeom& g, const Tables& tb, const void* act,
+            const int32_t* src, void* out, float* dm, cudaStream_t s) {
+#if !defined(__HIPCC__)
+    if constexpr (stage2_kernel<T, GU>) {
+        if (iq3_stage2() && (g.gu_type == T_IQ3_S || g.gu_type == T_IQ3_XXS) && g.d_type == T_IQ4_NL)
+            return launch_variant<T, GU, 2>(ww, grid, b, g, tb, act, src, out, dm, s);
+    }
+#endif
+    launch_variant<T, GU>(ww, grid, b, g, tb, act, src, out, dm, s);
 }
 
 // The work item's shape for a layer of `n` routed rows over `n_expert` experts: 128 routed rows when an expert has
