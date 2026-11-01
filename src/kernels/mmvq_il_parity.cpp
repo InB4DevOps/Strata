@@ -4,7 +4,8 @@
 //     build/mmvq_il_parity [--bench [--emit-table] [--hot] [--gap MB] [--persist] [--ab] [--pf a,b,..] [--rounds N]]
 //
 // --pf a,b,..: the P1 / P2 kernel variants (native_mmvq_il_pf: 0 = today's kernel, 6 hoisted group loads, 3 + P2's exact
-// integer forms, 4 = 3 at 5 blocks a SM, 2 / 5 = 3 / 4 with a ring) are each bit-checked against native_mmvq, and with
+// integer forms, 4 = 3 at 5 blocks a SM, 2 / 5 = 3 / 4 with a ring; 11 = Q6_K T4 L2 prefetch on sm_121) are each
+// bit-checked against native_mmvq, and with
 // --bench timed interleaved per (case, T, rows): N rounds
 // (default 5) of 100 calls each, variant after variant, the median of the rounds printed per variant (PFBENCH lines; the
 // table cells take the first listed variant).  Without --pf every call takes STRATA_MMVQ_IL_PF (unset: today's kernel).
@@ -120,7 +121,9 @@ const Case CASES[] = {
     {"Q6_K 2560x12288", 14, 2560, 12288, 256, 210, {208, -1}},
     {"Q6_K 2560x10240", 14, 2560, 10240, 256, 210, {208, -1}},
     {"Q6_K 6144x2560", 14, 6144, 2560, 256, 210, {208, -1}},
+    {"Q6_K head 2560x248320", 14, 2560, 248320, 256, 210, {208, -1}},
     {"Q6_K odd rows 2560x2051", 14, 2560, 2051, 256, 210, {208, -1}},
+    {"Q6_K odd rows 256x3", 14, 256, 3, 256, 210, {208, -1}},
     {"Q6_K 2560x512", 14, 2560, 512, 256, 210, {208, -1}},
     {"IQ4_XS 2560x12288", 23, 2560, 12288, 256, 136, {0, -1}},
     {"IQ4_XS 2560x640", 23, 2560, 640, 256, 136, {0, -1}},

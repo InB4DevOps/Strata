@@ -2151,7 +2151,7 @@ __global__ void native_mmvq_il_pf_kernel(const typename I::F::Block* __restrict_
     }
 }
 
-template <typename I, int NC, int R>
+template <typename I, int NC, int R, bool L2PF = false>
 __launch_bounds__(4 * WARP)
 __global__ void native_mmvq_il_kernel(const typename I::F::Block* __restrict__ w, const int* __restrict__ xq,
                                       const float* __restrict__ xd, float* __restrict__ y, int n_in, int n_out) {
@@ -2177,6 +2177,22 @@ __global__ void native_mmvq_il_kernel(const typename I::F::Block* __restrict__ w
 #pragma unroll
             for (int v = 0; v < 4; ++v) {
                 const int kbx = SUB * (m0 + v) + lane / F::T;
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ == 1210 && !defined(__HIPCC__)
+                if constexpr (L2PF) {
+                    // Q6_K: fetch one quant block ahead, without changing the loads or sums.
+                    // Three lanes cover the 210-byte block even when it straddles three 128-byte lines.
+                    const int pf = kbx + 1;
+                    if (pf < bpr && lane < 3) {
+#pragma unroll
+                        for (int i = 0; i < R; ++i) {
+                            const int row = min(row0 + i, n_out - 1);
+                            const char* p = reinterpret_cast<const char*>(w + std::size_t(row) * bpr + pf);
+                            p += lane == 2 ? 208 : 128 * lane;
+                            asm volatile("prefetch.global.L2 [%0];" :: "l"(p));
+                        }
+                    }
+                }
+#endif
                 if (kbx < bpr) {
 #pragma unroll
                     for (int i = 0; i < R; ++i) {
@@ -2211,7 +2227,8 @@ int il_pf_env() {
 }
 int il_pf_table(int type, int ncols, int n_out);   // the sm_80 table below: pf << 4 | rows, 0 = today's kernel and table
 // the variant of one launch (g_il_pf, else STRATA_MMVQ_IL_PF: 0 / unset today's kernel, 1 the measured table, 2-6 that
-// variant for every type and shape), and with the table its rows a warp (0: the rows table's)
+// variant for every type and shape; 11: Q6_K T4 L2 prefetch on sm_121), and with the table its rows a warp
+// (0: the rows table's)
 int il_pf_for(int type, int ncols, int n_out, int* rows) {
     *rows = 0;
     if (g_il_pf >= 0) return g_il_pf;
@@ -2221,10 +2238,19 @@ int il_pf_for(int type, int ncols, int n_out, int* rows) {
     *rows = t & 15;
     return t >> 4;
 }
+int il_cc();
 // one (type, columns, rows) launch: today's kernel, or the variant il_pf_for names for a type that has them
 template <typename I, int NC, int R>
 void launch_il_one(unsigned blocks, const typename I::F::Block* w, const int* xq, const float* xd, float* y, int n_in, int n_out,
                    cudaStream_t s, int pf) {
+#if !defined(__HIPCC__)
+    if constexpr (std::is_same_v<I, IlQ6K> && NC == 4) {
+        if (pf == 11 && il_cc() == 121) {
+            native_mmvq_il_kernel<I, NC, R, true><<<blocks, 4 * WARP, 0, s>>>(w, xq, xd, y, n_in, n_out);
+            return;
+        }
+    }
+#endif
     if constexpr (I::HAS_PF) {
         switch (pf) {
         case 6: native_mmvq_il_pf_kernel<I, NC, R, 0, 4, false><<<blocks, 4 * WARP, 0, s>>>(w, xq, xd, y, n_in, n_out); return;

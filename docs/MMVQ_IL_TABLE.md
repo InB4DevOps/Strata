@@ -51,3 +51,30 @@ Every listed variant is bit-checked against native_mmvq first, then timed interl
 calls, default 5; the median per variant on the `PFBENCH` lines). The last block (`variant << 4 | rows over --pf`) is in the
 source form of `kIlPf_<cc>`. `il_pf_table` reads only sm_80's table today, so a new card's block also needs its lookup
 there. Post the whole output on the issue.
+
+## GB10 Q6_K L2 prefetch (opt-in)
+
+`STRATA_MMVQ_IL_PF=11` enables a cache prefetch for Q6_K interleaved matvecs with four tokens on GB10 (sm_121).
+Three lanes fetch the next 210-byte weight block into L2. The weight layout and arithmetic order stay the same.
+Unset or `0` disables it. Other devices, quantisation types and token counts use their existing kernels.
+
+To also use the interleaved kernel for Q6_K output projections with 2048–4095 rows, set:
+
+```sh
+export STRATA_MMVQ_IL_PF=11
+export STRATA_MMVQ_IL_ROWS='14:4:0,1,1,1,1'
+```
+
+These are engine environment variables. Set them before starting the engine. The row override applies to four-token
+Q6_K calls only; matrices with fewer than 2048 rows keep the plain kernel. Both settings are opt-in.
+
+Check parity and measure on the target card:
+
+```sh
+MMVQ_IL_ONLY=Q6_K build/mmvq_il_parity --pf 0,11
+MMVQ_IL_ONLY=Q6_K MMVQ_IL_TMIN=4 MMVQ_IL_TMAX=4 build/mmvq_il_parity --bench --pf 0,11 --rounds 5
+MMVQ_IL_ONLY=Q6_K MMVQ_IL_TMIN=4 MMVQ_IL_TMAX=4 build/mmvq_il_parity --bench --pf 11,0 --rounds 5
+```
+
+The Q6_K cases include the output head, odd row counts and a single-block reduction. A kernel speedup alone is not a
+decode speedup: also compare full decode runs in both orders with the same output tokens and verification work.
