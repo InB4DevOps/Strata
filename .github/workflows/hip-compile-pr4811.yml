@@ -13,18 +13,18 @@ jobs:
     container:
       image: rocm/dev-ubuntu-24.04:10.1.0-full
     steps:
+      - name: Install build tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            build-essential ca-certificates cmake git ninja-build
+
       - uses: actions/checkout@v4
         with:
           ref: fb1a4dc6495740b70ad8cb0e6b66f748e5aa527a
 
       - name: Verify submitted revision
         run: test "$(git rev-parse HEAD)" = fb1a4dc6495740b70ad8cb0e6b66f748e5aa527a
-
-      - name: Install build tools
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            build-essential ca-certificates cmake git ninja-build
 
       - name: Show toolchain
         run: |
