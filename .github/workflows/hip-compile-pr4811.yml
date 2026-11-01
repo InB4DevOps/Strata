@@ -24,7 +24,9 @@ jobs:
           ref: fb1a4dc6495740b70ad8cb0e6b66f748e5aa527a
 
       - name: Verify submitted revision
-        run: test "$(git rev-parse HEAD)" = fb1a4dc6495740b70ad8cb0e6b66f748e5aa527a
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          test "$(git rev-parse HEAD)" = fb1a4dc6495740b70ad8cb0e6b66f748e5aa527a
 
       - name: Show toolchain
         run: |
