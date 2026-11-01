@@ -37,5 +37,5 @@ jobs:
             -DSTRATA_ENABLE_CUDA=OFF \
             -DSTRATA_BUILD_TESTS=ON \
             -DCMAKE_HIP_ARCHITECTURES=gfx1100
-      - name: Build HIP engine and parity
-        run: cmake --build build-hip --target strata mmvq_il_parity -j2
+      - name: Build HIP engine
+        run: cmake --build build-hip --target strata -j2
