@@ -174,7 +174,8 @@ int native_mmvq_il_rows_for(int cc, int ggml_type, int ncols, int n_out);
 // Tests and benchmarks: every native_mmvq_il call takes `rows` a warp (0: the table).
 void native_mmvq_il_tune(int rows);
 // Tests and benchmarks: the kernel variant for every native_mmvq_il call (0: today's kernel, 2-6 as
-// STRATA_MMVQ_IL_PF; 11: Q6_K T4 L2 prefetch on sm_121; -1: the environment).
+// STRATA_MMVQ_IL_PF; sm_121 L2 prefetch: 11 Q6_K T4, 12 Q6_K T2-4,
+// 13 Q6_K/Q4_K/Q5_K/IQ4_XS T2-4, 14 the latter three types; -1: the environment).
 void native_mmvq_il_pf(int pf);
 
 } // namespace strata::kernels

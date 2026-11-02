@@ -2179,15 +2179,17 @@ __global__ void native_mmvq_il_kernel(const typename I::F::Block* __restrict__ w
                 const int kbx = SUB * (m0 + v) + lane / F::T;
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ == 1210 && !defined(__HIPCC__)
                 if constexpr (L2PF) {
-                    // Q6_K: fetch one quant block ahead, without changing the loads or sums.
-                    // Three lanes cover the 210-byte block even when it straddles three 128-byte lines.
-                    const int pf = kbx + 1;
-                    if (pf < bpr && lane < 3) {
+                    static_assert(F::T >= 3 && sizeof(typename F::Block) > 128 && sizeof(typename F::Block) <= 256);
+                    // Fetch the next warp chunk, without changing the loads or sums.
+                    // Each block's first three lanes cover its at-most-three 128-byte lines.
+                    const int pf = kbx + SUB;
+                    const int pf_lane = lane % F::T;
+                    if (pf < bpr && pf_lane < 3) {
 #pragma unroll
                         for (int i = 0; i < R; ++i) {
                             const int row = min(row0 + i, n_out - 1);
                             const char* p = reinterpret_cast<const char*>(w + std::size_t(row) * bpr + pf);
-                            p += lane == 2 ? 208 : 128 * lane;
+                            p += pf_lane == 2 ? int(sizeof(typename F::Block)) - 2 : 128 * pf_lane;
                             asm volatile("prefetch.global.L2 [%0];" :: "l"(p));
                         }
                     }
@@ -2244,8 +2246,16 @@ template <typename I, int NC, int R>
 void launch_il_one(unsigned blocks, const typename I::F::Block* w, const int* xq, const float* xd, float* y, int n_in, int n_out,
                    cudaStream_t s, int pf) {
 #if !defined(__HIPCC__)
-    if constexpr (std::is_same_v<I, IlQ6K> && NC == 4) {
-        if (pf == 11 && il_cc() == 121) {
+    if constexpr (NC >= 2 && NC <= 4 && (std::is_same_v<I, IlQ6K> || std::is_same_v<I, IlQ4K> ||
+                                        std::is_same_v<I, IlQ5K> || std::is_same_v<I, IlIQ4XS>)) {
+        // Screening selectors: 12 = Q6_K T2-4; 13 = all four types T2-4;
+        // 14 = Q4_K/Q5_K/IQ4_XS only. Selector 11 keeps its Q6_K T4 scope.
+        bool l2pf = false;
+        if constexpr (std::is_same_v<I, IlQ6K>)
+            l2pf = pf == 12 || pf == 13 || (NC == 4 && pf == 11);
+        else if constexpr (std::is_same_v<I, IlQ4K> || std::is_same_v<I, IlQ5K> || std::is_same_v<I, IlIQ4XS>)
+            l2pf = pf == 13 || pf == 14;
+        if (l2pf && il_cc() == 121) {
             native_mmvq_il_kernel<I, NC, R, true><<<blocks, 4 * WARP, 0, s>>>(w, xq, xd, y, n_in, n_out);
             return;
         }

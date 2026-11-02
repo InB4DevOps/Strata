@@ -52,11 +52,23 @@ calls, default 5; the median per variant on the `PFBENCH` lines). The last block
 source form of `kIlPf_<cc>`. `il_pf_table` reads only sm_80's table today, so a new card's block also needs its lookup
 there. Post the whole output on the issue.
 
-## GB10 Q6_K L2 prefetch (opt-in)
+## GB10 L2 prefetch (opt-in)
 
-`STRATA_MMVQ_IL_PF=11` enables a cache prefetch for Q6_K interleaved matvecs with four tokens on GB10 (sm_121).
-Three lanes fetch the next 210-byte weight block into L2. The weight layout and arithmetic order stay the same.
-Unset or `0` disables it. Other devices, quantisation types and token counts use their existing kernels.
+`STRATA_MMVQ_IL_PF` can enable a cache prefetch for interleaved matvecs on GB10 (sm_121):
+
+| Value | Weight types | Tokens per call |
+|---|---|---|
+| `11` | Q6_K | 4 |
+| `12` | Q6_K | 2–4 |
+| `13` | Q6_K, Q4_K, Q5_K, IQ4_XS | 2–4 |
+| `14` | Q4_K, Q5_K, IQ4_XS | 2–4 |
+
+Three lanes per block fetch the next warp-sized chunk of weights into L2. The weight layout and arithmetic order
+stay the same. Unset or `0` disables it. Calls outside the selected types and token counts, other devices, and HIP
+use their existing kernels. The row table is unchanged; calls that select a plain kernel do not use this hint.
+
+Set `STRATA_MMVQ_IL_PF=13` before starting the engine to try all four types. These are experimental selectors;
+measure full decode on the chosen workload before using them. Microbenchmark gains do not establish a decode gain.
 
 To also use the interleaved kernel for Q6_K output projections with 2048–4095 rows, set:
 
@@ -68,13 +80,14 @@ export STRATA_MMVQ_IL_ROWS='14:4:0,1,1,1,1'
 These are engine environment variables. Set them before starting the engine. The row override applies to four-token
 Q6_K calls only; matrices with fewer than 2048 rows keep the plain kernel. Both settings are opt-in.
 
-Check parity and measure on the target card:
+Check parity for all selectors and measure Q6_K on the target card:
 
 ```sh
-MMVQ_IL_ONLY=Q6_K build/mmvq_il_parity --pf 0,11
-MMVQ_IL_ONLY=Q6_K MMVQ_IL_TMIN=4 MMVQ_IL_TMAX=4 build/mmvq_il_parity --bench --pf 0,11 --rounds 5
-MMVQ_IL_ONLY=Q6_K MMVQ_IL_TMIN=4 MMVQ_IL_TMAX=4 build/mmvq_il_parity --bench --pf 11,0 --rounds 5
+build/mmvq_il_parity --pf 0,11,12,13,14
+MMVQ_IL_ONLY=Q6_K MMVQ_IL_TMIN=2 MMVQ_IL_TMAX=4 build/mmvq_il_parity --bench --pf 0,11,12,13,14 --rounds 7
+MMVQ_IL_ONLY=Q6_K MMVQ_IL_TMIN=2 MMVQ_IL_TMAX=4 build/mmvq_il_parity --bench --pf 14,13,12,11,0 --rounds 7
 ```
 
+Repeat the timing commands with `MMVQ_IL_ONLY=Q4_K`, `Q5_K` and `IQ4_XS` for those types.
 The Q6_K cases include the output head, odd row counts and a single-block reduction. A kernel speedup alone is not a
 decode speedup: also compare full decode runs in both orders with the same output tokens and verification work.
