@@ -1,4 +1,4 @@
-name: HIP compile Q6 L2 prefetch on main
+name: HIP compile expanded L2 prefetch on main
 
 on:
   push:
@@ -19,13 +19,14 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential ca-certificates cmake git ninja-build
       - uses: actions/checkout@v4
         with:
-          ref: 568740210411ed21f813bb0156a381120daf08b0
+          ref: 30376a236a988d5565cbe4199fea7126555c788c
       - name: Verify submitted revision
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          test "$(git rev-parse HEAD)" = 568740210411ed21f813bb0156a381120daf08b0
+          test "$(git rev-parse HEAD)" = 30376a236a988d5565cbe4199fea7126555c788c
           git show --stat HEAD
           sha256sum src/kernels/cuda/native_mmvq.cu src/kernels/mmvq_il_parity.cpp
+          test "$(sha256sum src/kernels/cuda/native_mmvq.cu | cut -d ' ' -f 1)" = 5caca488ba7ba44931cfe25dba13ca76bd8b9204d2365f675b724e3d6409f0b3
           hipcc --version
           cmake --version
           ninja --version
