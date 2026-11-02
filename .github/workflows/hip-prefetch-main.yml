@@ -1,4 +1,4 @@
-name: HIP compile expanded L2 prefetch on main
+name: HIP compile upstream expert layouts
 
 on:
   push:
@@ -19,14 +19,14 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential ca-certificates cmake git ninja-build
       - uses: actions/checkout@v4
         with:
-          ref: 30376a236a988d5565cbe4199fea7126555c788c
+          ref: c62d5e3a15b40ea51c96aae9e8d36928965f53ab
       - name: Verify submitted revision
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          test "$(git rev-parse HEAD)" = 30376a236a988d5565cbe4199fea7126555c788c
+          test "$(git rev-parse HEAD)" = c62d5e3a15b40ea51c96aae9e8d36928965f53ab
           git show --stat HEAD
-          sha256sum src/kernels/cuda/native_mmvq.cu src/kernels/mmvq_il_parity.cpp
-          test "$(sha256sum src/kernels/cuda/native_mmvq.cu | cut -d ' ' -f 1)" = 5caca488ba7ba44931cfe25dba13ca76bd8b9204d2365f675b724e3d6409f0b3
+          sha256sum src/kernels/cuda/iq_kernels.cu src/kernels/native_expert_parity.cpp
+          test "$(sha256sum src/kernels/cuda/iq_kernels.cu | cut -d ' ' -f 1)" = 719f2eee24f93733778239bf7727db7a0e01b51d2841f05fb86120a7396ac8c5
           hipcc --version
           cmake --version
           ninja --version
