@@ -12,7 +12,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from serve import server
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from serve import server  # noqa: E402
 
 FAKE = r'''import queue, sys, threading, time
 mode = sys.argv[sys.argv.index('--mode') + 1]
